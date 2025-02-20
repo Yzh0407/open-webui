@@ -50,6 +50,7 @@ def get_tools(
             module, _ = load_tools_module_by_id(tool_id)
             request.app.state.TOOLS[tool_id] = module
 
+        # 从各个tool模块中提取参数
         extra_params["__id__"] = tool_id
         if hasattr(module, "valves") and hasattr(module, "Valves"):
             valves = Tools.get_tool_valves_by_id(tool_id) or {}

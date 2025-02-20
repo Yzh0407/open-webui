@@ -71,14 +71,16 @@ def resolve_hostname(hostname):
 class SafeWebBaseLoader(WebBaseLoader):
     """WebBaseLoader with enhanced error handling for URLs."""
 
-    def __init__(self, trust_env: bool = False, *args, **kwargs):
+    def __init__(self, trust_env: bool = False, use_proxy: bool = False, *args, **kwargs):
         """Initialize SafeWebBaseLoader
         Args:
             trust_env (bool, optional): set to True if using proxy to make web requests, for example
                 using http(s)_proxy environment variables. Defaults to False.
+            use_proxy (bool, optional):  Whether to use the proxy for full-text search. Defaults to False.
         """
         super().__init__(*args, **kwargs)
         self.trust_env = trust_env
+        self.use_proxy = use_proxy
 
     async def _fetch(
         self, url: str, retries: int = 3, cooldown: int = 2, backoff: float = 1.5
@@ -93,12 +95,20 @@ class SafeWebBaseLoader(WebBaseLoader):
                     if not self.session.verify:
                         kwargs["ssl"] = False
 
-                    async with session.get(
-                        url, **(self.requests_kwargs | kwargs)
-                    ) as response:
-                        if self.raise_for_status:
-                            response.raise_for_status()
-                        return await response.text()
+                    if self.use_proxy:
+                        # 使用代理
+                        proxy_url = f"https://r.jina.ai/{url}"
+                        async with session.get(proxy_url, **(self.requests_kwargs | kwargs)) as response:
+                            if self.raise_for_status:
+                                response.raise_for_status()
+                            return await response.text()
+                    else:
+                        # 不使用代理
+                        async with session.get(url, **(self.requests_kwargs | kwargs)) as response:
+                            if self.raise_for_status:
+                                response.raise_for_status()
+                            return await response.text()
+                    
                 except aiohttp.ClientConnectionError as e:
                     if i == retries - 1:
                         raise
@@ -173,25 +183,26 @@ class SafeWebBaseLoader(WebBaseLoader):
             if html := soup.find("html"):
                 metadata["language"] = html.get("lang", "No language found.")
             yield Document(page_content=text, metadata=metadata)
-
     async def aload(self) -> list[Document]:
         """Load data into Document objects."""
         return [document async for document in self.alazy_load()]
-
 
 def get_web_loader(
     urls: Union[str, Sequence[str]],
     verify_ssl: bool = True,
     requests_per_second: int = 2,
     trust_env: bool = False,
+    use_proxy: bool = False,  # 新增参数
 ):
     # Check if the URLs are valid
     safe_urls = safe_validate_urls([urls] if isinstance(urls, str) else urls)
 
     return SafeWebBaseLoader(
         web_path=safe_urls,
+        web_paths=safe_urls,
         verify_ssl=verify_ssl,
         requests_per_second=requests_per_second,
         continue_on_failure=True,
         trust_env=trust_env,
+        use_proxy=use_proxy,  # 传递给 SafeWebBaseLoader
     )

@@ -97,7 +97,7 @@ logging.basicConfig(stream=sys.stdout, level=GLOBAL_LOG_LEVEL)
 log = logging.getLogger(__name__)
 log.setLevel(SRC_LOG_LEVELS["MAIN"])
 
-
+# tools的作用的过程
 async def chat_completion_tools_handler(
     request: Request, body: dict, user: UserModel, models, tools
 ) -> tuple[dict, dict]:
@@ -152,6 +152,7 @@ async def chat_completion_tools_handler(
     else:
         template = DEFAULT_TOOLS_FUNCTION_CALLING_PROMPT_TEMPLATE
 
+    # 组成prompt 结合工具函数的函数说明
     tools_function_calling_prompt = tools_function_calling_generation_template(
         template, tools_specs
     )
@@ -161,6 +162,7 @@ async def chat_completion_tools_handler(
     )
 
     try:
+        # 先调用一次模型 判断一下是否需要执行这个工具函数 tools_function_calling_prompt是默认的prompt
         response = await generate_chat_completion(request, form_data=payload, user=user)
         log.debug(f"{response=}")
         content = await get_content_from_response(response)
@@ -170,6 +172,7 @@ async def chat_completion_tools_handler(
             return body, {}
 
         try:
+            # 判断返回的内容
             content = content[content.find("{") : content.rfind("}") + 1]
             if not content:
                 raise Exception("No JSON object found in the response")
@@ -412,7 +415,7 @@ async def chat_web_search_handler(
 
     return form_data
 
-
+# 图像生成
 async def chat_image_generation_handler(
     request: Request, form_data: dict, extra_params: dict, user
 ):
@@ -605,12 +608,13 @@ def apply_params_to_form_data(form_data, model):
 
     return form_data
 
-
+# 请求预处理
 async def process_chat_payload(request, form_data, metadata, user, model):
 
     form_data = apply_params_to_form_data(form_data, model)
     log.debug(f"form_data: {form_data}")
 
+    # 获取事件发射器和事件调用函数，用于向客户端发送事件。
     event_emitter = get_event_emitter(metadata)
     event_call = get_event_call(metadata)
 
@@ -650,6 +654,7 @@ async def process_chat_payload(request, form_data, metadata, user, model):
     user_message = get_last_user_message(form_data["messages"])
     model_knowledge = model.get("info", {}).get("meta", {}).get("knowledge", False)
 
+    # 时间发射器 显示正在知识库搜索中
     if model_knowledge:
         await event_emitter(
             {
@@ -712,6 +717,7 @@ async def process_chat_payload(request, form_data, metadata, user, model):
     features = form_data.pop("features", None)
     if features:
         if "web_search" in features and features["web_search"]:
+            # 执行网页搜索 处理输入
             form_data = await chat_web_search_handler(
                 request, form_data, extra_params, user
             )
@@ -747,6 +753,7 @@ async def process_chat_payload(request, form_data, metadata, user, model):
     tool_ids = metadata.get("tool_ids", None)
     log.debug(f"{tool_ids=}")
 
+    # 执行工具函数
     if tool_ids:
         # If tool_ids field is present, then get the tools
         tools = get_tools(
@@ -770,8 +777,10 @@ async def process_chat_payload(request, form_data, metadata, user, model):
                 for tool in tools.values()
             ]
         else:
+            # 非原生支持的function calling
             # If the function calling is not native, then call the tools function calling handler
             try:
+                log.info("这里开始执行非原生的function call ")
                 form_data, flags = await chat_completion_tools_handler(
                     request, form_data, user, models, tools
                 )

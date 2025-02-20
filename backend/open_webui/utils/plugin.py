@@ -67,7 +67,7 @@ def replace_imports(content):
 
     return content
 
-
+# 函数负责根据工具 ID (toolkit_id) 动态加载 Python 工具模块。
 def load_tools_module_by_id(toolkit_id, content=None):
 
     if content is None:

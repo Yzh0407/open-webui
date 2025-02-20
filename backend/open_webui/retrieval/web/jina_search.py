@@ -8,7 +8,8 @@ from yarl import URL
 log = logging.getLogger(__name__)
 log.setLevel(SRC_LOG_LEVELS["RAG"])
 
-
+# 这种调用方法返回的content 与直接访问接口r.jina.ai结果不一致
+# 这个api经常获取不到content
 def search_jina(api_key: str, query: str, count: int) -> list[SearchResult]:
     """
     Search using Jina's Search API and return the results as a list of SearchResult objects.

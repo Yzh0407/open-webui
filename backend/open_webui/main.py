@@ -933,12 +933,15 @@ async def chat_completion(
     if not request.app.state.MODELS:
         await get_all_models(request)
 
+    # 获取本次的对话模型
     model_item = form_data.pop("model_item", {})
+    # 获取需要处理的后台任务 这里正常情况下有两个 1. title_generation 2. tags_generation
     tasks = form_data.pop("background_tasks", None)
 
     try:
         if not model_item.get("direct", False):
             model_id = form_data.get("model", None)
+            # 检查模型ID是否存在于已加载的模型列表中
             if model_id not in request.app.state.MODELS:
                 raise Exception("Model not found")
 
@@ -970,6 +973,7 @@ async def chat_completion(
             "model": model_info,
             "direct": model_item.get("direct", False),
             **(
+                # 这里的配置是是否原声支持function call 可以在设置 模型界面配置
                 {"function_calling": "native"}
                 if form_data.get("params", {}).get("function_calling") == "native"
                 or (
